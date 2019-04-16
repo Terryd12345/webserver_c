@@ -34,6 +34,13 @@ static int const HTTP_400_LENGTH = 47;
 static char const * const HTTP_404 = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
 static int const HTTP_404_LENGTH = 45;
 
+static int user1 = -1;
+static int user1_start = 0;
+static int user2 = -1;
+static int user2_start = 0;
+
+static char *webpage;
+
 // represents the types of method
 typedef enum
 {
@@ -47,6 +54,7 @@ static bool handle_http_request(int sockfd)
     // try to read the request
     char buff[2049];
     int n = read(sockfd, buff, 2049);
+    printf("%s\n", buff);
     if (n <= 0)
     {
         if (n < 0)
@@ -60,7 +68,6 @@ static bool handle_http_request(int sockfd)
     buff[n] = 0;
 
     char * curr = buff;
-    printf("%s\n", curr);
 
     // parse the method
     METHOD method = UNKNOWN;
@@ -81,14 +88,22 @@ static bool handle_http_request(int sockfd)
     }
 
     // sanitise the URI
-    while (*curr == '.' || *curr == '/')
+    while (*curr == '.' || *curr == '/'){
         ++curr;
+    }
+    printf("I AM THE CURRENT: %s\n\n\n", curr);
     // assume the only valid request URI is "/" but it can be modified to accept more files
-    if (*curr == ' ')
+    if (*curr == ' ') {
         if (method == GET)
         {
-            char *webpage = "html/1_intro.html";
-
+            if( strstr(buff, "?start=Start") != NULL ){
+                webpage = "html/3_first_turn.html";
+                printf("\n\n\nWORKING\n\n\n");
+            } else {
+                webpage = "html/1_intro.html";
+            }
+            
+            
             // get the size of the file
             struct stat st;
             stat(webpage, &st);
@@ -122,10 +137,19 @@ static bool handle_http_request(int sockfd)
             int username_length = strlen(username);
             // the length needs to include the ", " before the username
             long added_length = username_length + 2;
+            
+            // Set sockfd to a user
+            if( user1 == -1 ){
+                user1 = sockfd;
+            } else if( user2 == -1 ){
+                user2 = sockfd;
+            }
+
+            webpage = "html/2_start.html";
 
             // get the size of the file
             struct stat st;
-            stat("html/2_start.html", &st);
+            stat(webpage, &st);
             // increase file size to accommodate the username
             long size = st.st_size + added_length;
             n = sprintf(buff, HTTP_200_FORMAT, size);
@@ -136,7 +160,7 @@ static bool handle_http_request(int sockfd)
                 return false;
             }
             // read the content of the HTML file
-            int filefd = open("html/2_start.html", O_RDONLY);
+            int filefd = open(webpage, O_RDONLY);
             n = read(filefd, buff, 2048);
             if (n < 0)
             {
@@ -145,27 +169,31 @@ static bool handle_http_request(int sockfd)
                 return false;
             }
             close(filefd);
-            // move the trailing part backward
-            int p1, p2;
-            for (p1 = size - 1, p2 = p1 - added_length; p1 >= size - 25; --p1, --p2)
-                buff[p1] = buff[p2];
-            ++p2;
-            // put the separator
-            buff[p2++] = ',';
-            buff[p2++] = ' ';
-            // copy the username
-            strncpy(buff + p2, username, username_length);
-            if (write(sockfd, buff, size) < 0)
-            {
-                perror("write");
-                return false;
+
+            if(strlen(username) > 0){
+                // move the trailing part backward
+                int p1, p2;
+                for (p1 = size - 1, p2 = p1 - added_length; p1 >= size - 25; --p1, --p2)
+                    buff[p1] = buff[p2];
+                ++p2;
+                // put the separator
+                buff[p2++] = ',';
+                buff[p2++] = ' ';
+                // copy the username
+                strncpy(buff + p2, username, username_length);
+                if (write(sockfd, buff, size) < 0)
+                {
+                    perror("write");
+                    return false;
+                }
             }
-        }
-        else
+        } 
+        else {
             // never used, just for completeness
             fprintf(stderr, "no other methods supported");
+        }
     // send 404
-    else if (write(sockfd, HTTP_404, HTTP_404_LENGTH) < 0)
+    } else if (write(sockfd, HTTP_404, HTTP_404_LENGTH) < 0)
     {
         perror("write");
         return false;
@@ -234,7 +262,7 @@ int main(int argc, char * argv[])
         }
 
         // loop all possible descriptor
-        for (int i = 0; i <= maxfd; ++i)
+        for (int i = 0; i <= maxfd; ++i) {
             // determine if the current file descriptor is active
             if (FD_ISSET(i, &readfds))
             {
@@ -270,6 +298,7 @@ int main(int argc, char * argv[])
                     FD_CLR(i, &masterfds);
                 }
             }
+        }
     }
 
     return 0;
