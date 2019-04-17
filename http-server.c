@@ -36,6 +36,7 @@ static int const HTTP_404_LENGTH = 45;
 
 static int user1 = -1;
 static int user1_start = 0;
+
 static int user2 = -1;
 static int user2_start = 0;
 
@@ -91,14 +92,18 @@ static bool handle_http_request(int sockfd)
     while (*curr == '.' || *curr == '/'){
         ++curr;
     }
-    printf("I AM THE CURRENT: %s\n\n\n", curr);
-    // assume the only valid request URI is "/" but it can be modified to accept more files
-    if (*curr == ' ') {
+    
+    if (strlen(curr) > 0) {
+        
         if (method == GET)
         {
             if( strstr(buff, "?start=Start") != NULL ){
+                if(sockfd == user1){
+                    user1_start = 1;
+                } else if(sockfd == user2){
+                    user2_start = 1;
+                }
                 webpage = "html/3_first_turn.html";
-                printf("\n\n\nWORKING\n\n\n");
             } else {
                 webpage = "html/1_intro.html";
             }
@@ -150,9 +155,11 @@ static bool handle_http_request(int sockfd)
             // get the size of the file
             struct stat st;
             stat(webpage, &st);
+
             // increase file size to accommodate the username
             long size = st.st_size + added_length;
             n = sprintf(buff, HTTP_200_FORMAT, size);
+
             // send the header first
             if (write(sockfd, buff, n) < 0)
             {
