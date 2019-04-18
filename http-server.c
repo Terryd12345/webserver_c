@@ -55,7 +55,7 @@ static bool handle_http_request(int sockfd)
     // try to read the request
     char buff[2049];
     int n = read(sockfd, buff, 2049);
-    printf("%s\n", buff);
+    
     if (n <= 0)
     {
         if (n < 0)
@@ -136,29 +136,87 @@ static bool handle_http_request(int sockfd)
         }
         else if (method == POST)
         {
-            // locate the username, it is safe to do so in this sample code, but usually the result is expected to be
-            // copied to another buffer using strcpy or strncpy to ensure that it will not be overwritten.
-            char * username = strstr(buff, "user=") + 5;
-            int username_length = strlen(username);
-            // the length needs to include the ", " before the username
-            long added_length = username_length + 2;
-            
-            // Set sockfd to a user
-            if( user1 == -1 ){
+            char *username;
+            int username_length;
+            long added_length;
+            long size;
+
+            // Set User
+            if( (user1 == -1) && (sockfd != user2) ){
                 user1 = sockfd;
-            } else if( user2 == -1 ){
+            } else if( (user2 == -1) && (sockfd != user1) ){
                 user2 = sockfd;
             }
-
-            webpage = "html/2_start.html";
+            webpage = "html/2_start.html";            
 
             // get the size of the file
             struct stat st;
-            stat(webpage, &st);
 
-            // increase file size to accommodate the username
-            long size = st.st_size + added_length;
-            n = sprintf(buff, HTTP_200_FORMAT, size);
+            if(strstr(buff, "quit=Quit") != NULL){
+                stat(webpage, &st);
+                // Reset User
+                if(sockfd == user1){
+                    user1 = -1;
+                    user1_start = 0;
+                } else if(sockfd == user2){
+                    user2 = -1;
+                    user2_start = 0;
+                } else {
+                    printf("Sockfd not set for some reason..\n\n");
+                }
+
+                n = sprintf(buff, HTTP_200_FORMAT, st.st_size);
+                if (write(sockfd, buff, n) < 0)
+                {
+                    perror("write");
+                    return false;
+                }
+                webpage = "html/1_intro.html";
+                int filefd = open(webpage, O_RDONLY);
+                n = read(filefd, buff, 2048);
+                if (n < 0)
+                {
+                    perror("read");
+                    close(filefd);
+                    return false;
+                }
+                close(filefd);
+                stat(webpage, &st);
+                if (write(sockfd, buff, st.st_size) < 0)
+                {
+                    perror("write");
+                    return false;
+                }
+            } else if(strstr(buff, "user=") != NULL){
+                stat(webpage, &st);
+                username = strstr(buff, "user=") + 5;
+                username_length = strlen(username);
+                added_length = username_length + 2;
+                size = st.st_size + added_length;
+                n = sprintf(buff, HTTP_200_FORMAT, size);
+            }
+            else if(strstr(buff, "guess=Guess") != NULL) {     
+                if(sockfd == user1){
+                    if(user2_start == 1){
+                        webpage = "html/4_accepted.html";
+                    } else {
+                        webpage = "html/5_discarded.html";
+                    }
+                } else if(sockfd == user2){
+                    if(user1_start == 1){
+                        webpage = "html/4_accepted.html";
+                    } else {
+                        webpage = "html/5_discarded.html";
+                    }
+                } else {
+                    printf("No one is logged in..");
+                }
+                stat(webpage, &st);
+                n = sprintf(buff, HTTP_200_FORMAT, st.st_size);
+                
+            } else {
+                printf("\n\n\nerror reading html...\n\n\n");
+            }
 
             // send the header first
             if (write(sockfd, buff, n) < 0)
@@ -169,6 +227,7 @@ static bool handle_http_request(int sockfd)
             // read the content of the HTML file
             int filefd = open(webpage, O_RDONLY);
             n = read(filefd, buff, 2048);
+            
             if (n < 0)
             {
                 perror("read");
@@ -177,7 +236,7 @@ static bool handle_http_request(int sockfd)
             }
             close(filefd);
 
-            if(strlen(username) > 0){
+            if((strlen(username) > 0) && (strstr(buff, "user=") != NULL) ){
                 // move the trailing part backward
                 int p1, p2;
                 for (p1 = size - 1, p2 = p1 - added_length; p1 >= size - 25; --p1, --p2)
@@ -193,6 +252,10 @@ static bool handle_http_request(int sockfd)
                     perror("write");
                     return false;
                 }
+            } else {
+                printf("%s\n", buff);
+                write(sockfd, buff, st.st_size);
+                
             }
         } 
         else {
