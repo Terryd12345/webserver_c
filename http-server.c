@@ -44,6 +44,8 @@ static int user2_start = 0;
 char user2_guesses[100][100];
 int user2_guess_number = 0;
 
+int gameover = 0;
+
 static char *webpage;
 
 // represents the types of method
@@ -157,6 +159,7 @@ static bool handle_http_request(int sockfd)
             struct stat st;
 
             if(strstr(buff, "quit=Quit") != NULL){
+                webpage = "html/7_gameover.html";
                 stat(webpage, &st);
                 // Reset User
                 if(sockfd == user1){
@@ -175,8 +178,6 @@ static bool handle_http_request(int sockfd)
                     perror("write");
                     return false;
                 }
-
-                webpage = "html/7_gameover.html.html";
 
                 int filefd = open(webpage, O_RDONLY);
                 n = read(filefd, buff, 2048);
@@ -216,6 +217,7 @@ static bool handle_http_request(int sockfd)
                         for(int i=0; i<user2_guess_number; i++)
                         {
                             if(strcmp(user2_guesses[i], keyword) == 0){
+                                gameover = 1;
                                 user1 = -1;
                                 user2 = -1;
                                 user1_guess_number = 0;
@@ -230,10 +232,10 @@ static bool handle_http_request(int sockfd)
                             }
                         }
                         
-                    } 
-                    else if(user2 == -1){
-                        webpage = "html/7_gameover.html";
-                    } 
+                    } else if( gameover == 1){
+                        webpage = "html/6_endgame.html";
+                        gameover = 0;
+                    }
                     else {
                         webpage = "html/5_discarded.html";
                     }
@@ -247,6 +249,7 @@ static bool handle_http_request(int sockfd)
                         for(int i=0; i<user1_guess_number; i++)
                         {
                             if(strcmp(user1_guesses[i], keyword) == 0){
+                                gameover = 1;
                                 user1 = -1;
                                 user2 = -1;
                                 user1_guess_number = 0;
@@ -261,8 +264,9 @@ static bool handle_http_request(int sockfd)
                             }
                         }
                     } 
-                    else if(user1 == -1){
-                        webpage = "html/7_gameover.html";
+                    else if( gameover == 1){
+                        webpage = "html/6_endgame.html";
+                        gameover = 0;
                     }
                     else {
                         webpage = "html/5_discarded.html";
