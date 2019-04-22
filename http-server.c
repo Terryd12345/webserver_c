@@ -225,8 +225,8 @@ static bool handle_http_request(int sockfd)
                                 user1_start = 0;
                                 user2_start = 0;
                                 for(int i=0; i<100; i++){
-                                    strcpy(user1_guesses[i], "");
-                                    strcpy(user2_guesses[i],"");
+                                    memset(user1_guesses[i], '\0', 100);
+                                    memset(user2_guesses[i], '\0', 100);
                                 }
                                 webpage = "html/6_endgame.html";
                             }
@@ -235,8 +235,7 @@ static bool handle_http_request(int sockfd)
                     } else if( gameover == 1){
                         webpage = "html/6_endgame.html";
                         gameover = 0;
-                    }
-                    else {
+                    } else {
                         webpage = "html/5_discarded.html";
                     }
                 } else if(sockfd == user2){
@@ -257,18 +256,16 @@ static bool handle_http_request(int sockfd)
                                 user1_start = 0;
                                 user2_start = 0;
                                 for(int i=0; i<100; i++){
-                                    strcpy(user1_guesses[i], "");
-                                    strcpy(user2_guesses[i],"");
+                                    memset(user1_guesses[i], '\0', 100);
+                                    memset(user2_guesses[i], '\0', 100);
                                 }
                                 webpage = "html/6_endgame.html";
                             }
                         }
-                    } 
-                    else if( gameover == 1){
+                    } else if( gameover == 1){
                         webpage = "html/6_endgame.html";
                         gameover = 0;
-                    }
-                    else {
+                    } else {
                         webpage = "html/5_discarded.html";
                     }
                 } else {
@@ -306,7 +303,7 @@ static bool handle_http_request(int sockfd)
                     buff[p1] = buff[p2];
                 ++p2;
                 // put the separator
-                buff[p2++] = ',';
+                buff[p2++] = ' ';
                 buff[p2++] = ' ';
                 // copy the username
                 strncpy(buff + p2, username, username_length);
