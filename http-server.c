@@ -196,6 +196,10 @@ static bool handle_http_request(int sockfd)
                 n = sprintf(buff, HTTP_200_FORMAT, size);
             }
             else if(strstr(buff, "guess=Guess") != NULL) {     
+                char *keyword = strstr(buff, "keyword=")+8;
+                int keyword_length = strlen(keyword);
+                printf("%s\n", keyword);
+
                 if(sockfd == user1){
                     if(user2_start == 1){
                         webpage = "html/4_accepted.html";
@@ -253,9 +257,11 @@ static bool handle_http_request(int sockfd)
                     return false;
                 }
             } else {
-                printf("%s\n", buff);
-                write(sockfd, buff, st.st_size);
-                
+                if (write(sockfd, buff, st.st_size) < 0)
+                {
+                    perror("write");
+                    return false;
+                }
             }
         } 
         else {
