@@ -36,9 +36,15 @@ static int const HTTP_404_LENGTH = 45;
 
 static int user1 = -1;
 static int user1_start = 0;
+char user1_guesses[100][100];
+int user1_guess_number = 0;
 
 static int user2 = -1;
 static int user2_start = 0;
+char user2_guesses[100][100];
+int user2_guess_number = 0;
+
+int gameover = 0;
 
 static char *webpage;
 
@@ -153,6 +159,7 @@ static bool handle_http_request(int sockfd)
             struct stat st;
 
             if(strstr(buff, "quit=Quit") != NULL){
+                webpage = "html/7_gameover.html";
                 stat(webpage, &st);
                 // Reset User
                 if(sockfd == user1){
@@ -171,7 +178,7 @@ static bool handle_http_request(int sockfd)
                     perror("write");
                     return false;
                 }
-                webpage = "html/1_intro.html";
+
                 int filefd = open(webpage, O_RDONLY);
                 n = read(filefd, buff, 2048);
                 if (n < 0)
@@ -195,20 +202,69 @@ static bool handle_http_request(int sockfd)
                 size = st.st_size + added_length;
                 n = sprintf(buff, HTTP_200_FORMAT, size);
             }
-            else if(strstr(buff, "guess=Guess") != NULL) {     
+            else if(strstr(buff, "guess=Guess") != NULL) {  
                 char *keyword = strstr(buff, "keyword=")+8;
                 int keyword_length = strlen(keyword);
-                printf("%s\n", keyword);
+                keyword[keyword_length-12] = '\0';
 
                 if(sockfd == user1){
                     if(user2_start == 1){
                         webpage = "html/4_accepted.html";
+                        strcpy(user1_guesses[user1_guess_number], keyword);
+                        printf("%s\n", user1_guesses[user1_guess_number]);
+                        user1_guess_number++;
+
+                        for(int i=0; i<user2_guess_number; i++)
+                        {
+                            if(strcmp(user2_guesses[i], keyword) == 0){
+                                gameover = 1;
+                                user1 = -1;
+                                user2 = -1;
+                                user1_guess_number = 0;
+                                user2_guess_number = 0;
+                                user1_start = 0;
+                                user2_start = 0;
+                                for(int i=0; i<100; i++){
+                                    memset(user1_guesses[i], '\0', 100);
+                                    memset(user2_guesses[i], '\0', 100);
+                                }
+                                webpage = "html/6_endgame.html";
+                            }
+                        }
+                        
+                    } else if( gameover == 1){
+                        webpage = "html/6_endgame.html";
+                        gameover = 0;
                     } else {
                         webpage = "html/5_discarded.html";
                     }
                 } else if(sockfd == user2){
                     if(user1_start == 1){
                         webpage = "html/4_accepted.html";
+                        strcpy(user2_guesses[user2_guess_number], keyword);
+                        printf("%s\n", user2_guesses[user2_guess_number]);
+                        user2_guess_number++;
+
+                        for(int i=0; i<user1_guess_number; i++)
+                        {
+                            if(strcmp(user1_guesses[i], keyword) == 0){
+                                gameover = 1;
+                                user1 = -1;
+                                user2 = -1;
+                                user1_guess_number = 0;
+                                user2_guess_number = 0;
+                                user1_start = 0;
+                                user2_start = 0;
+                                for(int i=0; i<100; i++){
+                                    memset(user1_guesses[i], '\0', 100);
+                                    memset(user2_guesses[i], '\0', 100);
+                                }
+                                webpage = "html/6_endgame.html";
+                            }
+                        }
+                    } else if( gameover == 1){
+                        webpage = "html/6_endgame.html";
+                        gameover = 0;
                     } else {
                         webpage = "html/5_discarded.html";
                     }
@@ -247,7 +303,7 @@ static bool handle_http_request(int sockfd)
                     buff[p1] = buff[p2];
                 ++p2;
                 // put the separator
-                buff[p2++] = ',';
+                buff[p2++] = ' ';
                 buff[p2++] = ' ';
                 // copy the username
                 strncpy(buff + p2, username, username_length);
@@ -262,6 +318,7 @@ static bool handle_http_request(int sockfd)
                     perror("write");
                     return false;
                 }
+                
             }
         } 
         else {
