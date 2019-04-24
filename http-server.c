@@ -25,9 +25,15 @@
 #include <stdint.h>
 #include <time.h>
 
+void reset_game();
+void reset_user(int sockfd);
+void set_user(int sockfd);
+void user_ready(int sockfd);
+
 // constants
 static char const * const HTTP_200_FORMAT = "HTTP/1.1 200 OK\r\n\
 Content-Type: text/html\r\n\
+Set-Cookie: name=foo\r\n\
 Content-Length: %ld\r\n\r\n";
 static char const * const HTTP_400 = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
 static int const HTTP_400_LENGTH = 47;
@@ -61,7 +67,6 @@ static bool handle_http_request(int sockfd)
     // try to read the request
     char buff[2049];
     int n = read(sockfd, buff, 2049);
-    
     if (n <= 0)
     {
         if (n < 0)
@@ -70,6 +75,7 @@ static bool handle_http_request(int sockfd)
             printf("socket %d close the connection\n", sockfd);
         return false;
     }
+    printf("%s\n", buff);
 
     // terminate the string
     buff[n] = 0;
@@ -103,21 +109,30 @@ static bool handle_http_request(int sockfd)
         
         if (method == GET)
         {
+
+            
             if( strstr(buff, "?start=Start") != NULL ){
-                if(sockfd == user1){
-                    user1_start = 1;
-                } else if(sockfd == user2){
-                    user2_start = 1;
+                /* Handle resetting users when starting a new game */
+                printf("gameover: %d\n", gameover);
+                if(gameover == 0){
+                    set_user(sockfd);
+                } else {
+                    printf("Restarting game, user1: %d, user2: %d\n", user1, user2);
+                    gameover = 0;
                 }
+
+                user_ready(sockfd);
                 webpage = "html/3_first_turn.html";
             } else {
                 webpage = "html/1_intro.html";
             }
             
             
+            
             // get the size of the file
             struct stat st;
             stat(webpage, &st);
+
             n = sprintf(buff, HTTP_200_FORMAT, st.st_size);
             // send the header first
             if (write(sockfd, buff, n) < 0)
@@ -126,6 +141,7 @@ static bool handle_http_request(int sockfd)
                 return false;
             }
             // send the file
+
             int filefd = open(webpage, O_RDONLY);
             do
             {
@@ -146,14 +162,8 @@ static bool handle_http_request(int sockfd)
             int username_length;
             long added_length;
             long size;
-
-            // Set User
-            if( (user1 == -1) && (sockfd != user2) ){
-                user1 = sockfd;
-            } else if( (user2 == -1) && (sockfd != user1) ){
-                user2 = sockfd;
-            }
-            webpage = "html/2_start.html";            
+            
+            webpage = "html/2_start.html";   
 
             // get the size of the file
             struct stat st;
@@ -162,15 +172,7 @@ static bool handle_http_request(int sockfd)
                 webpage = "html/7_gameover.html";
                 stat(webpage, &st);
                 // Reset User
-                if(sockfd == user1){
-                    user1 = -1;
-                    user1_start = 0;
-                } else if(sockfd == user2){
-                    user2 = -1;
-                    user2_start = 0;
-                } else {
-                    printf("Sockfd not set for some reason..\n\n");
-                }
+                reset_user(sockfd);
 
                 n = sprintf(buff, HTTP_200_FORMAT, st.st_size);
                 if (write(sockfd, buff, n) < 0)
@@ -187,6 +189,7 @@ static bool handle_http_request(int sockfd)
                     close(filefd);
                     return false;
                 }
+
                 close(filefd);
                 stat(webpage, &st);
                 if (write(sockfd, buff, st.st_size) < 0)
@@ -207,34 +210,25 @@ static bool handle_http_request(int sockfd)
                 int keyword_length = strlen(keyword);
                 keyword[keyword_length-12] = '\0';
 
-                if(sockfd == user1){
+                if (sockfd == user1){
+                    /* if other player is ready then accept guesses */
                     if(user2_start == 1){
                         webpage = "html/4_accepted.html";
                         strcpy(user1_guesses[user1_guess_number], keyword);
-                        printf("%s\n", user1_guesses[user1_guess_number]);
                         user1_guess_number++;
 
+                        /* Check if other play has made the same guess */
                         for(int i=0; i<user2_guess_number; i++)
                         {
                             if(strcmp(user2_guesses[i], keyword) == 0){
-                                gameover = 1;
-                                user1 = -1;
-                                user2 = -1;
-                                user1_guess_number = 0;
-                                user2_guess_number = 0;
-                                user1_start = 0;
-                                user2_start = 0;
-                                for(int i=0; i<100; i++){
-                                    memset(user1_guesses[i], '\0', 100);
-                                    memset(user2_guesses[i], '\0', 100);
-                                }
+                                reset_game();
                                 webpage = "html/6_endgame.html";
                             }
                         }
                         
                     } else if( gameover == 1){
                         webpage = "html/6_endgame.html";
-                        gameover = 0;
+                  
                     } else {
                         webpage = "html/5_discarded.html";
                     }
@@ -242,35 +236,24 @@ static bool handle_http_request(int sockfd)
                     if(user1_start == 1){
                         webpage = "html/4_accepted.html";
                         strcpy(user2_guesses[user2_guess_number], keyword);
-                        printf("%s\n", user2_guesses[user2_guess_number]);
                         user2_guess_number++;
 
                         for(int i=0; i<user1_guess_number; i++)
                         {
                             if(strcmp(user1_guesses[i], keyword) == 0){
-                                gameover = 1;
-                                user1 = -1;
-                                user2 = -1;
-                                user1_guess_number = 0;
-                                user2_guess_number = 0;
-                                user1_start = 0;
-                                user2_start = 0;
-                                for(int i=0; i<100; i++){
-                                    memset(user1_guesses[i], '\0', 100);
-                                    memset(user2_guesses[i], '\0', 100);
-                                }
+                                reset_game(); 
                                 webpage = "html/6_endgame.html";
                             }
                         }
                     } else if( gameover == 1){
                         webpage = "html/6_endgame.html";
-                        gameover = 0;
                     } else {
                         webpage = "html/5_discarded.html";
                     }
                 } else {
-                    printf("No one is logged in..");
+                    webpage = "html/6_endgame.html";
                 }
+
                 stat(webpage, &st);
                 n = sprintf(buff, HTTP_200_FORMAT, st.st_size);
                 
@@ -436,3 +419,61 @@ int main(int argc, char * argv[])
 
     return 0;
 }
+
+
+void reset_game(){
+    gameover = 1;
+    user1 = -1;
+    user2 = -1;
+    user1_guess_number = 0;
+    user2_guess_number = 0;
+    user1_start = 0;
+    user2_start = 0;
+
+    for(int i=0; i<100; i++){
+        memset(user1_guesses[i], '\0', 100);
+        memset(user2_guesses[i], '\0', 100);
+    }
+    printf("Game reset\n");
+}
+
+void reset_user(int sockfd){
+    if(sockfd == user1){
+        user1 = -1;
+        user1_start = 0;
+        printf("User1 reset\n");
+    } else if(sockfd == user2){
+        user2 = -1;
+        user2_start = 0;
+        printf("User2 reset\n");
+    } else {
+        printf("Sockfd not set for some reason..\n\n");
+    }
+}
+
+void set_user(int sockfd){
+    if( sockfd == user1 ){
+        // do nothing
+        printf("User1 already set\n");
+    } else if( sockfd == user2 ){
+        // do nothing
+        printf("User2 already set\n");
+    } else if( (user1 == -1) && (sockfd != user2) ){
+        user1 = sockfd;
+        printf("User1 set to socket: %d\n", sockfd);
+    } else if( (user2 == -1) && (sockfd != user1) ){
+        user2 = sockfd;
+        printf("User2 set to socket: %d\n", sockfd);
+    }
+}
+
+void user_ready(int sockfd){
+    if( (sockfd == user1) && (user1_start == 0)  ){
+        user1_start = 1;
+        printf("User1 ready\n");
+    } else if( (sockfd == user2) && (user2_start == 0) ){
+        user2_start = 1;
+        printf("User2 ready\n");
+    }
+}
+
