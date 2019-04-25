@@ -33,7 +33,10 @@ void user_ready(int sockfd);
 // constants
 static char const * const HTTP_200_FORMAT = "HTTP/1.1 200 OK\r\n\
 Content-Type: text/html\r\n\
-Set-Cookie: name=foo\r\n\
+Content-Length: %ld\r\n\r\n";
+static char const * const HTTP_200_FORMAT_WITH_COOKIE = "HTTP/1.1 200 OK\r\n\
+Content-Type: text/html\r\n\
+Set-Cookie: id=%s\r\n\
 Content-Length: %ld\r\n\r\n";
 static char const * const HTTP_400 = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
 static int const HTTP_400_LENGTH = 47;
@@ -41,11 +44,13 @@ static char const * const HTTP_404 = "HTTP/1.1 404 Not Found\r\nContent-Length: 
 static int const HTTP_404_LENGTH = 45;
 
 static int user1 = -1;
+static char *user1_name = "";
 static int user1_start = 0;
 char user1_guesses[100][100];
 int user1_guess_number = 0;
 
 static int user2 = -1;
+static char *user2_name = "";
 static int user2_start = 0;
 char user2_guesses[100][100];
 int user2_guess_number = 0;
@@ -75,7 +80,6 @@ static bool handle_http_request(int sockfd)
             printf("socket %d close the connection\n", sockfd);
         return false;
     }
-    printf("%s\n", buff);
 
     // terminate the string
     buff[n] = 0;
@@ -109,7 +113,6 @@ static bool handle_http_request(int sockfd)
         
         if (method == GET)
         {
-
             
             if( strstr(buff, "?start=Start") != NULL ){
                 /* Handle resetting users when starting a new game */
@@ -123,7 +126,10 @@ static bool handle_http_request(int sockfd)
 
                 user_ready(sockfd);
                 webpage = "html/3_first_turn.html";
+            } else if( strstr(buff, "Cookie:") != NULL ) {
+                webpage = "html/1_intro.html";
             } else {
+
                 webpage = "html/1_intro.html";
             }
             
@@ -200,15 +206,20 @@ static bool handle_http_request(int sockfd)
             } else if(strstr(buff, "user=") != NULL){
                 stat(webpage, &st);
                 username = strstr(buff, "user=") + 5;
+                
+                set_user(sockfd);
+
                 username_length = strlen(username);
                 added_length = username_length + 2;
                 size = st.st_size + added_length;
-                n = sprintf(buff, HTTP_200_FORMAT, size);
+                n = sprintf(buff, HTTP_200_FORMAT_WITH_COOKIE, username, size);
             }
             else if(strstr(buff, "guess=Guess") != NULL) {  
                 char *keyword = strstr(buff, "keyword=")+8;
                 int keyword_length = strlen(keyword);
                 keyword[keyword_length-12] = '\0';
+
+                
 
                 if (sockfd == user1){
                     /* if other player is ready then accept guesses */
@@ -226,9 +237,8 @@ static bool handle_http_request(int sockfd)
                             }
                         }
                         
-                    } else if( gameover == 1){
-                        webpage = "html/6_endgame.html";
-                  
+                    } else if( gameover == 1 ){
+                        webpage = "html/6_endgame.html"; 
                     } else {
                         webpage = "html/5_discarded.html";
                     }
@@ -246,11 +256,12 @@ static bool handle_http_request(int sockfd)
                             }
                         }
                     } else if( gameover == 1){
-                        webpage = "html/6_endgame.html";
+                        webpage = "html/6_endgame.html"; 
                     } else {
                         webpage = "html/5_discarded.html";
                     }
                 } else {
+                    printf("user1: %d, user2: %d\n", user1, user2);
                     webpage = "html/6_endgame.html";
                 }
 
@@ -423,8 +434,6 @@ int main(int argc, char * argv[])
 
 void reset_game(){
     gameover = 1;
-    user1 = -1;
-    user2 = -1;
     user1_guess_number = 0;
     user2_guess_number = 0;
     user1_start = 0;
