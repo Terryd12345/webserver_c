@@ -29,6 +29,7 @@ void reset_game();
 void reset_user(int sockfd);
 void set_user(int sockfd);
 void user_ready(int sockfd);
+void print_details();
 
 // constants
 static char const * const HTTP_200_FORMAT = "HTTP/1.1 200 OK\r\n\
@@ -114,7 +115,11 @@ static bool handle_http_request(int sockfd)
         if (method == GET)
         {
             
-            if( strstr(buff, "?start=Start") != NULL ){
+            if( strstr(buff, "start=Start") != NULL ){
+                if( strcmp(webpage, "html/2_start.html") ){
+                    user_ready(sockfd);
+                }
+            
                 /* Handle resetting users when starting a new game */
                 printf("gameover: %d\n", gameover);
                 if(gameover == 0){
@@ -122,9 +127,7 @@ static bool handle_http_request(int sockfd)
                 } else {
                     printf("Restarting game, user1: %d, user2: %d\n", user1, user2);
                     gameover = 0;
-                }
-
-                user_ready(sockfd);
+                }                
                 webpage = "html/3_first_turn.html";
             } else if( strstr(buff, "Cookie:") != NULL ) {
                 webpage = "html/1_intro.html";
@@ -161,6 +164,7 @@ static bool handle_http_request(int sockfd)
                 return false;
             }
             close(filefd);
+            
         }
         else if (method == POST)
         {
@@ -207,7 +211,7 @@ static bool handle_http_request(int sockfd)
                 stat(webpage, &st);
                 username = strstr(buff, "user=") + 5;
                 
-                set_user(sockfd);
+                //set_user(sockfd);
 
                 username_length = strlen(username);
                 added_length = username_length + 2;
@@ -215,15 +219,14 @@ static bool handle_http_request(int sockfd)
                 n = sprintf(buff, HTTP_200_FORMAT_WITH_COOKIE, username, size);
             }
             else if(strstr(buff, "guess=Guess") != NULL) {  
+                
                 char *keyword = strstr(buff, "keyword=")+8;
                 int keyword_length = strlen(keyword);
                 keyword[keyword_length-12] = '\0';
 
-                
-
-                if (sockfd == user1){
+                if (sockfd == user1){            
                     /* if other player is ready then accept guesses */
-                    if(user2_start == 1){
+                    if( user2_start == 1  ){
                         webpage = "html/4_accepted.html";
                         strcpy(user1_guesses[user1_guess_number], keyword);
                         user1_guess_number++;
@@ -243,7 +246,7 @@ static bool handle_http_request(int sockfd)
                         webpage = "html/5_discarded.html";
                     }
                 } else if(sockfd == user2){
-                    if(user1_start == 1){
+                    if( user1_start == 1  ){
                         webpage = "html/4_accepted.html";
                         strcpy(user2_guesses[user2_guess_number], keyword);
                         user2_guess_number++;
@@ -267,6 +270,13 @@ static bool handle_http_request(int sockfd)
 
                 stat(webpage, &st);
                 n = sprintf(buff, HTTP_200_FORMAT, st.st_size);
+
+                if(sockfd == user1){
+                    printf("I AM USER1");
+                } else if( sockfd == user2 ){
+                    printf("I AM USER2");
+                }
+                print_details();
                 
             } else {
                 printf("\n\n\nerror reading html...\n\n\n");
@@ -299,6 +309,7 @@ static bool handle_http_request(int sockfd)
                 // put the separator
                 buff[p2++] = ' ';
                 buff[p2++] = ' ';
+                
                 // copy the username
                 strncpy(buff + p2, username, username_length);
                 if (write(sockfd, buff, size) < 0)
@@ -434,6 +445,8 @@ int main(int argc, char * argv[])
 
 void reset_game(){
     gameover = 1;
+    user1 = -1;
+    user2 = -1;
     user1_guess_number = 0;
     user2_guess_number = 0;
     user1_start = 0;
@@ -486,3 +499,6 @@ void user_ready(int sockfd){
     }
 }
 
+void print_details(){
+    printf("User1: %d, User2: %d, User1_start: %d, User2_start: %d\n\n", user1, user2, user1_start, user2_start);
+}
