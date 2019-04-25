@@ -30,6 +30,7 @@ void reset_user(int sockfd);
 void set_user(int sockfd);
 void user_ready(int sockfd);
 void print_details();
+void check_win(int user, char *keyword);
 
 // constants
 static char const * const HTTP_200_FORMAT = "HTTP/1.1 200 OK\r\n\
@@ -230,16 +231,7 @@ static bool handle_http_request(int sockfd)
                         webpage = "html/4_accepted.html";
                         strcpy(user1_guesses[user1_guess_number], keyword);
                         user1_guess_number++;
-
-                        /* Check if other play has made the same guess */
-                        for(int i=0; i<user2_guess_number; i++)
-                        {
-                            if(strcmp(user2_guesses[i], keyword) == 0){
-                                reset_game();
-                                webpage = "html/6_endgame.html";
-                            }
-                        }
-                        
+                        check_win(1, keyword);            
                     } else if( gameover == 1 ){
                         webpage = "html/6_endgame.html"; 
                     } else {
@@ -250,14 +242,7 @@ static bool handle_http_request(int sockfd)
                         webpage = "html/4_accepted.html";
                         strcpy(user2_guesses[user2_guess_number], keyword);
                         user2_guess_number++;
-
-                        for(int i=0; i<user1_guess_number; i++)
-                        {
-                            if(strcmp(user1_guesses[i], keyword) == 0){
-                                reset_game(); 
-                                webpage = "html/6_endgame.html";
-                            }
-                        }
+                        check_win(2, keyword);
                     } else if( gameover == 1){
                         webpage = "html/6_endgame.html"; 
                     } else {
@@ -299,6 +284,31 @@ static bool handle_http_request(int sockfd)
                 return false;
             }
             close(filefd);
+
+            if( strcmp(webpage, "html/4_accepted.html") == 0 ){
+                
+                char *user1_current_guesses;
+                char *user2_current_guesses;
+
+                if(sockfd == user1){
+                    for(int i=0; i<100; i++){
+                        if( strlen(user1_guesses[i]) > 0 ){
+                            //strncat(user1_current_guesses, user1_guesses[i], strlen(user1_guesses[i]));
+                        }
+                    }
+                } else if(sockfd == user2){
+                    for(int i=0; i<100; i++){
+                        if( strlen(user2_guesses[i]) > 0 ){
+                            //strncat(user2_current_guesses, user2_guesses[i], strlen(user2_guesses[i]));
+                        }
+                    }
+                }
+                
+                printf("User1 guesses: %s, User2 guesses: %s\n", user1_current_guesses, user2_current_guesses);
+   
+
+                
+            }
 
             if((strlen(username) > 0) && (strstr(buff, "user=") != NULL) ){
                 // move the trailing part backward
@@ -496,6 +506,24 @@ void user_ready(int sockfd){
     } else if( (sockfd == user2) && (user2_start == 0) ){
         user2_start = 1;
         printf("User2 ready\n");
+    }
+}
+
+void check_win(int user, char *keyword){
+    if(user == 1){
+        for(int i=0; i<user2_guess_number; i++){
+            if(strcmp(user2_guesses[i], keyword) == 0){
+                reset_game(); 
+                webpage = "html/6_endgame.html";
+            }
+        }
+    } else if( user == 2){
+        for(int i=0; i<user1_guess_number; i++){
+            if(strcmp(user1_guesses[i], keyword) == 0){
+                reset_game(); 
+                webpage = "html/6_endgame.html";
+            }
+        }
     }
 }
 
