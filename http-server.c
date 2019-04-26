@@ -122,7 +122,6 @@ static bool handle_http_request(int sockfd)
                 }
             
                 /* Handle resetting users when starting a new game */
-                printf("gameover: %d\n", gameover);
                 if(gameover == 0){
                     set_user(sockfd);
                 } else {
@@ -133,7 +132,6 @@ static bool handle_http_request(int sockfd)
             } else if( strstr(buff, "Cookie:") != NULL ) {
                 webpage = "html/1_intro.html";
             } else {
-
                 webpage = "html/1_intro.html";
             }
             
@@ -255,13 +253,6 @@ static bool handle_http_request(int sockfd)
 
                 stat(webpage, &st);
                 n = sprintf(buff, HTTP_200_FORMAT, st.st_size);
-
-                if(sockfd == user1){
-                    printf("I AM USER1");
-                } else if( sockfd == user2 ){
-                    printf("I AM USER2");
-                }
-                print_details();
                 
             } else {
                 printf("\n\n\nerror reading html...\n\n\n");
@@ -287,27 +278,30 @@ static bool handle_http_request(int sockfd)
 
             if( strcmp(webpage, "html/4_accepted.html") == 0 ){
                 
-                char *user1_current_guesses;
-                char *user2_current_guesses;
-
+                char user1_current_guesses[10100];
+                char user2_current_guesses[10100];
+    
                 if(sockfd == user1){
+                    memset(user1_current_guesses, '\0', 10100);
                     for(int i=0; i<100; i++){
                         if( strlen(user1_guesses[i]) > 0 ){
-                            //strncat(user1_current_guesses, user1_guesses[i], strlen(user1_guesses[i]));
+                            strncat(user1_current_guesses, user1_guesses[i], strlen(user1_guesses[i])+2);
+                            strncat(user1_current_guesses, ", ", 3);
                         }
                     }
+
                 } else if(sockfd == user2){
+                    memset(user2_current_guesses, '\0', 10100);
                     for(int i=0; i<100; i++){
                         if( strlen(user2_guesses[i]) > 0 ){
-                            //strncat(user2_current_guesses, user2_guesses[i], strlen(user2_guesses[i]));
+                            strncat(user2_current_guesses, user2_guesses[i], strlen(user2_guesses[i])+1);
+                            strncat(user2_current_guesses, ", ", 3);
                         }
                     }
                 }
                 
-                printf("User1 guesses: %s, User2 guesses: %s\n", user1_current_guesses, user2_current_guesses);
-   
-
-                
+                printf("\nUser1 guesses: %s\n User2 guesses: %s\n", user1_current_guesses, user2_current_guesses);
+                     
             }
 
             if((strlen(username) > 0) && (strstr(buff, "user=") != NULL) ){
