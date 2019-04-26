@@ -56,6 +56,8 @@ static char *user2_name = "";
 static int user2_start = 0;
 char user2_guesses[100][100];
 int user2_guess_number = 0;
+char *user1_current_guesses;
+char *user2_current_guesses;
 
 int gameover = 0;
 
@@ -232,7 +234,7 @@ static bool handle_http_request(int sockfd)
                         strcpy(user1_guesses[user1_guess_number], keyword);
                         user1_guess_number++;
                         check_win(1, keyword);            
-                    } else if( gameover == 1 ){
+                    } else if( gameover == 1 ){ 
                         webpage = "html/6_endgame.html"; 
                     } else {
                         webpage = "html/5_discarded.html";
@@ -243,13 +245,12 @@ static bool handle_http_request(int sockfd)
                         strcpy(user2_guesses[user2_guess_number], keyword);
                         user2_guess_number++;
                         check_win(2, keyword);
-                    } else if( gameover == 1){
+                    } else if( gameover == 1){    
                         webpage = "html/6_endgame.html"; 
                     } else {
                         webpage = "html/5_discarded.html";
                     }
                 } else {
-                    printf("user1: %d, user2: %d\n", user1, user2);
                     webpage = "html/6_endgame.html";
                 }
 
@@ -286,9 +287,6 @@ static bool handle_http_request(int sockfd)
             close(filefd);
 
             if( strcmp(webpage, "html/4_accepted.html") == 0 ){
-                
-                char *user1_current_guesses;
-                char *user2_current_guesses;
 
                 if(sockfd == user1){
                     for(int i=0; i<100; i++){
@@ -305,8 +303,6 @@ static bool handle_http_request(int sockfd)
                 }
                 
                 printf("User1 guesses: %s, User2 guesses: %s\n", user1_current_guesses, user2_current_guesses);
-   
-
                 
             }
 
