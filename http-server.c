@@ -76,8 +76,8 @@ typedef enum
 static bool handle_http_request(int sockfd)
 {
     // try to read the request
-    char buff[2049];
-    int n = read(sockfd, buff, 2049);
+    char buff[5000];
+    int n = read(sockfd, buff, 5000);
     if (n <= 0)
     {
         if (n < 0)
@@ -322,9 +322,8 @@ static bool handle_http_request(int sockfd)
                         }
                     }
                    insert_substring(buff, user2_current_guesses, 587);
-                   
                 }
-
+          
                 if (write(sockfd, buff, st.st_size) < 0)
                 {
                     perror("write");
