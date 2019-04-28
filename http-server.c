@@ -329,8 +329,6 @@ static bool handle_http_request(int sockfd)
                     perror("write");
                     return false;
                 }
-                
-                printf("\nUser1 guesses: %s\n User2 guesses: %s\n", user1_current_guesses, user2_current_guesses); 
             } else {
                 if (write(sockfd, buff, st.st_size) < 0)
                 {
