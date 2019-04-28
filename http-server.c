@@ -31,6 +31,8 @@ void set_user(int sockfd);
 void user_ready(int sockfd);
 void print_details();
 void check_win(int user, char *keyword);
+char *substring(char *string, int position, int length);
+void insert_substring(char *a, char *b, int position);
 
 // constants
 static char const * const HTTP_200_FORMAT = "HTTP/1.1 200 OK\r\n\
@@ -117,8 +119,11 @@ static bool handle_http_request(int sockfd)
         
         if (method == GET)
         {
-            
+            // get the size of the file
+            struct stat st;
+
             if( strstr(buff, "start=Start") != NULL ){
+
                 if( strcmp(webpage, "html/2_start.html") ){
                     user_ready(sockfd);
                 }
@@ -131,16 +136,10 @@ static bool handle_http_request(int sockfd)
                     gameover = 0;
                 }                
                 webpage = "html/3_first_turn.html";
-            } else if( strstr(buff, "Cookie:") != NULL ) {
-                webpage = "html/1_intro.html";
             } else {
                 webpage = "html/1_intro.html";
             }
             
-            
-            
-            // get the size of the file
-            struct stat st;
             stat(webpage, &st);
 
             n = sprintf(buff, HTTP_200_FORMAT, st.st_size);
@@ -165,7 +164,6 @@ static bool handle_http_request(int sockfd)
                 return false;
             }
             close(filefd);
-            
         }
         else if (method == POST)
         {
@@ -217,30 +215,40 @@ static bool handle_http_request(int sockfd)
                 size = st.st_size + added_length;
                 n = sprintf(buff, HTTP_200_FORMAT_WITH_COOKIE, username, size);
             }
-            else if(strstr(buff, "guess=Guess") != NULL) {  
-                
+            else if(strstr(buff, "guess=Guess") != NULL) { 
                 char *keyword = strstr(buff, "keyword=")+8;
                 int keyword_length = strlen(keyword);
                 keyword[keyword_length-12] = '\0';
-
-                if (sockfd == user1){            
+                    
+                if (sockfd == user1){                               
                     /* if other player is ready then accept guesses */
-                    if( user2_start == 1  ){
+                    if( user2_start == 1  ){   
                         webpage = "html/4_accepted.html";
                         strcpy(user1_guesses[user1_guess_number], keyword);
                         user1_guess_number++;
-                        check_win(1, keyword);            
+                        check_win(1, keyword); 
+
+                        username_length = strlen(username);
+                        added_length = username_length + 2;
+                        size = st.st_size + added_length;
+                        n = sprintf(buff, HTTP_200_FORMAT_WITH_COOKIE, username, size);          
                     } else if( gameover == 1 ){ 
                         webpage = "html/6_endgame.html"; 
                     } else {
                         webpage = "html/5_discarded.html";
                     }
                 } else if(sockfd == user2){
+                    
                     if( user1_start == 1  ){
                         webpage = "html/4_accepted.html";
                         strcpy(user2_guesses[user2_guess_number], keyword);
                         user2_guess_number++;
                         check_win(2, keyword);
+
+                        username_length = strlen(username);
+                        added_length = username_length + 2;
+                        size = st.st_size + added_length;
+                        n = sprintf(buff, HTTP_200_FORMAT_WITH_COOKIE, username, size);
                     } else if( gameover == 1){    
                         webpage = "html/6_endgame.html"; 
                     } else {
@@ -275,8 +283,26 @@ static bool handle_http_request(int sockfd)
             }
             close(filefd);
 
-            
-            if( strcmp(webpage, "html/4_accepted.html") == 0 ){
+
+            if((strlen(username) > 0) && (strstr(buff, "user=") != NULL) ){
+                // move the trailing part backward
+                int p1, p2;
+                for (p1 = size - 1, p2 = p1 - added_length; p1 >= size - 25; --p1, --p2)
+                    buff[p1] = buff[p2];
+                ++p2;
+                
+                buff[p2++] = ' ';
+                buff[p2++] = ' ';
+                
+                
+                // copy the username
+                strncpy(buff + p2, username, username_length);
+                if (write(sockfd, buff, size) < 0)
+                {
+                    perror("write");
+                    return false;
+                }
+            } else if( strcmp(webpage, "html/4_accepted.html") == 0 ){
                 if(sockfd == user1){
                     memset(user1_current_guesses, '\0', 10100);
                     for(int i=0; i<100; i++){
@@ -285,6 +311,7 @@ static bool handle_http_request(int sockfd)
                             strncat(user1_current_guesses, ", ", 3);
                         }
                     }
+                   insert_substring(buff, user1_current_guesses, 587);
 
                 } else if(sockfd == user2){
                     memset(user2_current_guesses, '\0', 10100);
@@ -294,30 +321,17 @@ static bool handle_http_request(int sockfd)
                             strncat(user2_current_guesses, ", ", 3);
                         }
                     }
+                   insert_substring(buff, user2_current_guesses, 587);
+                   
                 }
-                
-                printf("User1 guesses: %s, User2 guesses: %s\n", user1_current_guesses, user2_current_guesses);
-                
-            }
-            
 
-            if((strlen(username) > 0) && (strstr(buff, "user=") != NULL) ){
-                // move the trailing part backward
-                int p1, p2;
-                for (p1 = size - 1, p2 = p1 - added_length; p1 >= size - 25; --p1, --p2)
-                    buff[p1] = buff[p2];
-                ++p2;
-                // put the separator
-                buff[p2++] = ' ';
-                buff[p2++] = ' ';
-                
-                // copy the username
-                strncpy(buff + p2, username, username_length);
-                if (write(sockfd, buff, size) < 0)
+                if (write(sockfd, buff, st.st_size) < 0)
                 {
                     perror("write");
                     return false;
                 }
+                
+                printf("\nUser1 guesses: %s\n User2 guesses: %s\n", user1_current_guesses, user2_current_guesses); 
             } else {
                 if (write(sockfd, buff, st.st_size) < 0)
                 {
@@ -516,6 +530,42 @@ void check_win(int user, char *keyword){
             }
         }
     }
+}
+
+void insert_substring(char *a, char *b, int position)
+{
+   char *f, *e;
+   int length;
+   
+   length = strlen(a);
+   
+   f = substring(a, 1, position - 1 );      
+   e = substring(a, position, length-position+1);
+ 
+   strcpy(a, "");
+   strcat(a, f);
+   free(f);
+   strcat(a, b);
+   strcat(a, e);
+   free(e);
+}
+ 
+char *substring(char *string, int position, int length)
+{
+   char *pointer;
+   int c;
+ 
+   pointer = malloc(length+1);
+   
+   if( pointer == NULL )
+       exit(EXIT_FAILURE);
+ 
+   for( c = 0 ; c < length ; c++ )
+      *(pointer+c) = *((string+position-1)+c);      
+       
+   *(pointer+c) = '\0';
+ 
+   return pointer;
 }
 
 void print_details(){
